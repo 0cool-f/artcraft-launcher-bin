@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: 0BSD
+# Opens a PR moving the package to upstream's latest stable release; merging it publishes to the AUR.
+name: update
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  bump:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+      - name: Find a newer upstream release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh api repos/storytold/craft-launcher/releases/latest --jq .tag_name)
+          latest=${tag#v}
+          current=$(sed -n 's/^pkgver=//p' PKGBUILD)
+          if [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n 1)" = "$current" ]; then
+            echo "artcraft-launcher $current is up to date"
+            exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "update/$latest" >/dev/null; then
+            echo "branch update/$latest already exists"
+            exit 0
+          fi
+          echo "version=$latest" >> "$GITHUB_OUTPUT"
+      - name: Update PKGBUILD and open a PR
+        if: steps.latest.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          ci/update.sh "$VERSION" "$RUNNER_TEMP/notes.md"
+          git checkout -b "update/$VERSION"
+          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+              commit -am "Update to $VERSION"
+          git push origin "update/$VERSION"
+          gh pr create --base main --head "update/$VERSION" --title "Update to $VERSION" --body-file "$RUNNER_TEMP/notes.md"

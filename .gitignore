@@ -1,0 +1,5 @@
+build/
+src/
+pkg/
+*.tar.gz
+*.pkg.tar.zst
