@@ -7,11 +7,14 @@ release tarballs for `x86_64` and `aarch64`, published as
 ## How it is maintained
 
 - `update` runs daily: when upstream publishes a newer stable release it sets `pkgver`, resets
-  `pkgrel` and takes the checksums from the release's `SHA256SUMS.txt`, builds the package, and
-  opens a PR whose description compares `depends`/`optdepends` with upstream's own Arch package.
-- `ci` builds every push in an Arch container with `makepkg` and `namcap` and checks that
-  `.SRCINFO` matches the PKGBUILD; on `main` it then pushes PKGBUILD and `.SRCINFO` to the AUR
-  through the `aur` environment, so merging an update PR publishes it.
+  `pkgrel`, takes the checksums from the release's `SHA256SUMS.txt`, builds the package and opens
+  a PR whose description compares `depends`/`optdepends` with upstream's own Arch package. When
+  both match it merges the PR and publishes to the AUR in the same run; otherwise the PR waits
+  for a manual merge.
+- `ci` builds every push and PR in an Arch container with `makepkg` and `namcap` and checks that
+  `.SRCINFO` matches the PKGBUILD; on `main` it then publishes PKGBUILD and `.SRCINFO` to the AUR
+  through `publish` and the `aur` environment.
+- `automerge` merges Dependabot PRs once `ci` has passed on them.
 
 ## Local use
 

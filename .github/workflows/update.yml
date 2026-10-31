@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: 0BSD
-# Opens a PR moving the package to upstream's latest stable release; merging it publishes to the AUR.
+# Opens a PR moving the package to upstream's latest stable release, after building it. When the
+# dependencies match upstream's Arch package it merges the PR and publishes to the AUR itself,
+# since events made with GITHUB_TOKEN start no other workflow; otherwise the PR waits for review.
 name: update
 
 on:
@@ -9,12 +11,17 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: update
+
 jobs:
   bump:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      merged: ${{ steps.pr.outputs.merged }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,14 +44,31 @@ jobs:
           fi
           echo "version=$latest" >> "$GITHUB_OUTPUT"
       - name: Update PKGBUILD and open a PR
+        id: pr
         if: steps.latest.outputs.version != ''
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.latest.outputs.version }}
         run: |
-          ci/update.sh "$VERSION" "$RUNNER_TEMP/notes.md"
+          deps=$(ci/update.sh "$VERSION" "$RUNNER_TEMP/notes.md")
           git checkout -b "update/$VERSION"
           git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
               commit -am "Update to $VERSION"
           git push origin "update/$VERSION"
           gh pr create --base main --head "update/$VERSION" --title "Update to $VERSION" --body-file "$RUNNER_TEMP/notes.md"
+          if [ "$deps" != match ]; then
+            echo "dependencies differ from upstream: leaving the PR for review"
+            exit 0
+          fi
+          gh pr merge "update/$VERSION" --squash --delete-branch --match-head-commit "$(git rev-parse HEAD)"
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: bump
+    if: needs.bump.outputs.merged == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publish.yml
+    with:
+      ref: main
+    secrets: inherit

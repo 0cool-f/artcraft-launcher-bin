@@ -23,30 +23,7 @@ jobs:
   aur:
     needs: check
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    environment: aur
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Push to the AUR
-        env:
-          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-        run: |
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
-          chmod 600 ~/.ssh/aur
-          grep -v '^#' ci/known_hosts > ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
-          git clone ssh://aur@aur.archlinux.org/artcraft-launcher-bin.git aur-repo
-          cp PKGBUILD .SRCINFO aur-repo/
-          version=$(sed -n 's/^\tpkgver = //p' .SRCINFO)-$(sed -n 's/^\tpkgrel = //p' .SRCINFO)
-          cd aur-repo
-          git add PKGBUILD .SRCINFO
-          if git diff --cached --quiet; then
-            echo "AUR repository already up to date"
-            exit 0
-          fi
-          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
-              commit -m "Update to $version"
-          git push origin HEAD:master
+    uses: ./.github/workflows/publish.yml
+    with:
+      ref: ${{ github.sha }}
+    secrets: inherit

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: 0BSD
 # Moves PKGBUILD and .SRCINFO to upstream release VERSION, with checksums from its SHA256SUMS.txt,
 # and writes to NOTES a comparison of our dependencies with those of upstream's own Arch package.
+# Prints `match` when both dependency lists equal upstream's, `differ` otherwise.
 # Usage: ci/update.sh VERSION NOTES   (needs gh; build output goes to stderr)
 set -eu
 
@@ -36,6 +37,7 @@ deps "$dl/PKGINFO" depend >"$dl/upstream-depends"
 deps "$root/.SRCINFO" depends >"$dl/our-depends"
 deps "$dl/PKGINFO" optdepend >"$dl/upstream-optdepends"
 deps "$root/.SRCINFO" optdepends >"$dl/our-optdepends"
+result=match
 {
     echo "Upstream release: https://github.com/$upstream/releases/tag/v$version"
     echo
@@ -43,6 +45,7 @@ deps "$root/.SRCINFO" optdepends >"$dl/our-optdepends"
         if diff -q "$dl/our-$kind" "$dl/upstream-$kind" >/dev/null; then
             echo "- \`$kind\` match upstream's Arch package."
         else
+            result=differ
             echo "- \`$kind\` differ from upstream's Arch package (\`-\` ours, \`+\` upstream):"
             echo
             echo '```diff'
@@ -51,3 +54,4 @@ deps "$root/.SRCINFO" optdepends >"$dl/our-optdepends"
         fi
     done
 } >"$notes"
+echo "$result"
