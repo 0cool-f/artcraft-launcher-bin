@@ -13,6 +13,7 @@ depends=(gcc-libs
          glibc
          hicolor-icon-theme
          libxkbcommon
+         libxkbcommon-x11
          vulkan-icd-loader)
 optdepends=('alsa-lib: sound support'
             'pipewire-alsa: audio playback and recording via PipeWire'
